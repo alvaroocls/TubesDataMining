@@ -10,10 +10,16 @@ This project analyzes various factors influencing employee income and demographi
 - **Puja Daffa Adilah** (1202223369)  
 
 ## How to Run the Project
-1. Install the required libraries:  
+
+1. Clone the repository:
+   
+   `git clone <repository-url>`
+   `cd <repository-folder>`
+
+2. Install the required libraries:  
 `pip install -r requirements.txt`
 
-2. Run the application
+3. Run the application
 `streamlit run app.py`
 
 
