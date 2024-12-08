@@ -8,7 +8,6 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 from streamlit_option_menu import option_menu
-from PIL import Image
 
 
 classifier = joblib.load('model.pkl')
