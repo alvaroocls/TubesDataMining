@@ -5,7 +5,7 @@ This project analyzes various factors influencing employee income and demographi
 
 ## Contributors
 - **Alvaro Cleosanda** (1202220181)  
-- **Vilson** (1202221202220199)  
+- **Vilson** (1202220199)  
 - **Alisha Deanova Oemar** (1202223105)  
 - **Puja Daffa Adilah** (1202223369)  
 
