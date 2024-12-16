@@ -1,4 +1,3 @@
-# Import Library yang akan dipakai (JANGAN DI HAPUS, ISI DIBAWAH INI)
 import pandas as pd
 import numpy as np
 import joblib
@@ -8,15 +7,19 @@ from sklearn.model_selection import train_test_split
 import matplotlib.pyplot as plt
 import seaborn as sns
 from streamlit_option_menu import option_menu
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score
+
 
 
 classifier = joblib.load('model.pkl')
+kmeans = joblib.load('kmeans.pkl')
+pca = joblib.load('pca.pkl')
 
-#scaler
 scaler = joblib.load('scaler.pkl')
-#df original
 df = pd.read_csv('Adult census income dataset.csv')
 df_preprocessed = pd.read_csv('Adult_census_income_preprocessed.csv')
+principaldf = pd.read_csv('Adult_census_income_clustered.csv')
 
 
 def prediction(age,	workclass,	educationNum,	maritalStatus,	occupation,	relationship,	race,	sex,	hoursPerWeek,	capitalGain,capitalLoss):
@@ -33,12 +36,14 @@ def prediction(age,	workclass,	educationNum,	maritalStatus,	occupation,	relation
         'capital':capitalGain-capitalLoss
     }
 
+    clustering_data = prepare_clustering(raw_data)
+    cluster_pred = kmeans.predict(clustering_data)
+
     clean_data = pipeline(raw_data)
-    
-    print(clean_data)
-    pred = classifier.predict(clean_data)
-    proba = classifier.predict_proba(clean_data)
-    return pred,proba
+    classification_pred = classifier.predict(clean_data)
+    classification_proba = classifier.predict_proba(clean_data)   
+
+    return classification_pred, classification_proba, cluster_pred
 
 
 def pipeline(data):
@@ -122,7 +127,37 @@ def pipeline(data):
 
     return clean_data
 
-# # Buat fungsi yang dapat mengeluarkan metrik evaluasi model (JANGAN DI HAPUS, ISI DIBAWAH INI)
+def prepare_clustering(data):
+    clustering_features = ['workclass', 'capital', 'educationNum']
+    clustering_data = {key: data[key] for key in clustering_features}
+
+    workclass_order = {
+        'Never-worked':0.000000,
+        'Without-pay':0.000000,
+        'Private':0.210093,
+        'State-gov' : 0.271957,
+        'Self-emp-not-inc' : 0.284927,
+        'Local-gov' : 0.294792,
+        'Federal-gov' : 0.386458,
+        'Self-emp-inc' : 0.557348
+    }
+
+    education_map = {
+    'Preschool': 0, '1st-4th': 0, '5th-6th': 0, '7th-8th': 0, '9th': 0,
+    '10th': 0, '11th': 0, '12th': 0,
+    'HS-grad': 1, 'Some-college': 1, 'Assoc-voc': 1, 'Assoc-acdm': 1,
+    'Bachelors': 1, 'Masters': 1,
+    'Doctorate': 2, 'Prof-school': 2
+    }
+
+    clustering_data['capital'] = data['capital']
+    clustering_data['educationNum'] = education_map[data['educationNum']]
+    clustering_data['workclass'] = workclass_order[data['workclass']]
+    
+    clustering_array = np.array(list(clustering_data.values())).reshape(1, -1)
+    clustering_pca = pca.transform(clustering_array)
+    return clustering_pca
+
 
 def evaluate_model(X_test, y_test):
     y_pred = classifier.predict(X_test)
@@ -136,7 +171,11 @@ def evaluate_model(X_test, y_test):
 
     return acc,prec,rec,f1,roc_auc,y_pred,y_pred_proba
 
-# # Buat fungsi untuk membuat visualisasi plot kurva ROC (JANGAN DI HAPUS, ISI DIBAWAH INI)
+def evaluate_clustering(principalDf):
+    features = principalDf[['principal component 1', 'principal component 2']].values
+    labels = principalDf['cluster'].values
+    score = silhouette_score(features, labels)
+    return score
 
 def plot_roc_curve(fpr,tpr,auc):
     plt.figure(figsize=(8,6))
@@ -148,7 +187,6 @@ def plot_roc_curve(fpr,tpr,auc):
     plt.legend(loc='lower right')
     st.pyplot(plt)
 
-# # Buat fungsi untuk membuat visualisasi confusion matrix (JANGAN DI HAPUS, ISI DIBAWAH INI)
 
 def plot_confusion_matrix(cm):
     plt.figure(figsize=(8,6))
@@ -156,9 +194,14 @@ def plot_confusion_matrix(cm):
     plt.xlabel('Predicted Label')
     plt.ylabel('True Label')
     plt.title('Confusion Matrix')
+    st.pyplot(plt)  
+
+def plot_clustering_result(principaldf):
+    plt.figure(figsize=(8,6))
+    sns.scatterplot(data=principaldf,x='principal component 1',y='principal component 2',hue='cluster',palette='Set1')
+    plt.title('Clustering Result')
     st.pyplot(plt)
 
-# # Buat fungsi utama yang akan memuat semua fungsi di atas dan ditampilkan pada Streamlit (JANGAN DI HAPUS, ISI DIBAWAH INI)
 
 def main():
     menu_selection = option_menu(
@@ -177,6 +220,7 @@ def main():
 
         # Team member table
         st.markdown("### Nama Anggota")
+        
         st.table({
             "Nama Anggota": ["Alvaro Cleosanda", "Vilson", "Alisha Deanova Oemar", "Puja Daffa Adilah"],
             "NIM": ["1202220181", "1202220199", "1202223105", "1202223369"],
@@ -221,7 +265,6 @@ def main():
             - **income**: Kategori pendapatan, baik ≤50K atau >50K.
         """)
 
-        #dataset sample without first column
         st.markdown("## 📊 **Sample Dataset**")
         st.write(df.head(5))
 
@@ -261,9 +304,10 @@ def main():
         proba_result = ""
 
         if st.button("Predict"):
-            result,proba = prediction(age,	workclass,	educationNum,	maritalStatus,	occupation,relationship,race,sex,hoursPerWeek,capitalGain,capitalLoss)
-            result = '>50k' if result[0] == 1 else '<=50k'
-            proba_result = f'{proba[0][0]}' if result == '<=50k' else f'{proba[0][1]}'
+            classification_pred, classification_proba, cluster_pred = prediction(age,	workclass,	educationNum,	maritalStatus,	occupation,relationship,race,sex,hoursPerWeek,capitalGain,capitalLoss)
+            result = '>50k' if classification_pred[0] == 1 else '<=50k'
+            proba_result = f'{classification_proba[0][0]}' if result == '<=50k' else f'{classification_proba[0][1]}'
+            st.info(f'Cluster Assignment: {cluster_pred[0]}')
         
         st.success(f'Prediction : {result}')
         st.info(f'Confidence Score : {proba_result}')
@@ -282,7 +326,7 @@ def main():
 
         accuracy,precision,recall,f1,roc_auc,y_pred,y_pred_proba = evaluate_model(X_test,y_test)
 
-        col1,col2,col3,col4 = st.columns(4)
+        col1,col2,col3,col4,col5 = st.columns(5)
 
         with col1:
             st.success(f'Accuracy : {accuracy:.2f}%')
@@ -292,8 +336,11 @@ def main():
             st.warning(f'Recall : {recall:.2f}%')
         with col4:
             st.error(f'F1 Score : {f1:.2f}%')
+        with col5:
+            silhouette_score_value = evaluate_clustering(principaldf)
+            st.info(f'Kmeans Silhouette Score: {silhouette_score_value:.2f}')
 
-        plot_option = st.selectbox('Choose Plot',['ROC AUC Curve','Confusion Matrix'])
+        plot_option = st.selectbox('Choose Plot',['ROC AUC Curve','Confusion Matrix','Classification Report','Clustering Result'])
 
         if plot_option == "ROC AUC Curve":
             fpr,tpr,_ = roc_curve(y_test,y_pred_proba)
@@ -301,6 +348,10 @@ def main():
         elif plot_option == "Confusion Matrix":
             cm = confusion_matrix(y_test,y_pred)
             plot_confusion_matrix(cm)
+        elif plot_option == "Classification Report":
+            st.text(classification_report(y_test,y_pred))
+        elif plot_option == "Clustering Result":
+            plot_clustering_result(principaldf)
    
 if __name__=='__main__':
     main()
